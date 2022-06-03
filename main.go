@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 )
 
@@ -37,6 +38,28 @@ func main() {
 
 func testCheck() {
 	fmt.Println("test")
+}
+
+func wgTest() {
+	var wait sync.WaitGroup
+	wait.Add(3)
+
+	go func() {
+		defer wait.Done()
+		fmt.Println("goroutine 1")
+	}()
+
+	go func() {
+		defer wait.Done()
+		fmt.Println("goroutine 2")
+	}()
+
+	go func() {
+		defer wait.Done()
+		fmt.Println("goroutine 3")
+	}()
+
+	wait.Wait()
 }
 
 var err error
