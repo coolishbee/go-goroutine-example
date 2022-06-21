@@ -3,13 +3,104 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
+	"runtime"
 	"sync"
 	"time"
+
+	"github.com/mojbro/gocoa"
 )
 
+var indicator *gocoa.ProgressIndicator
+
+const maxValue = 100.00
+
 func main() {
+	gocoa.InitApplication()
+	gocoa.OnApplicationDidFinishLaunching(func() {
+		fmt.Println("App running!")
+	})
+	wnd := gocoa.NewWindow("Hello World!", 150, 150, 300, 200)
+	quit := make(chan bool, 1)
+
+	// Change me button
+	// currentTitle, nextTitle := "Change me!", "Change me again!"
+	// changeButton := gocoa.NewButton(75, 125, 150, 25)
+	// changeButton.SetTitle(currentTitle)
+	// changeButton.OnClick(func() {
+	// 	changeButton.SetTitle(nextTitle)
+	// 	currentTitle, nextTitle = nextTitle, currentTitle
+	// })
+	// wnd.AddButton(changeButton)
+
+	// Start button
+	startBtn := gocoa.NewButton(75, 125, 150, 25)
+	startBtn.SetTitle("Start")
+	startBtn.OnClick(func() {
+
+		if runtime.NumGoroutine() < 2 {
+			go vpnCheck(quit, quit)
+		}
+
+		// go func(ch chan bool) {
+		// 	if safeCheck(ch) {
+		// 		vpnCheck(quit, quit)
+		// 	}
+		// }(quit)
+	})
+	wnd.AddButton(startBtn)
+
+	// Stop button
+	stopBtn := gocoa.NewButton(75, 80, 150, 25)
+	stopBtn.SetTitle("Stop")
+	stopBtn.OnClick(func() {
+		go func(ch chan bool) {
+			if safeCheck(ch) {
+				quit <- true
+				//close(ch)
+			}
+		}(quit)
+	})
+	wnd.AddButton(stopBtn)
+
+	// Quit button
+	quitButton := gocoa.NewButton(75, 50, 150, 25)
+	quitButton.SetTitle("Quit")
+	quitButton.OnClick(func() { gocoa.TerminateApplication() })
+	wnd.AddButton(quitButton)
+
+	wnd.MakeKeyAndOrderFront()
+	gocoa.RunApplication()
+}
+
+func vpnCheck(
+	recvCh <-chan bool,
+	sendCh chan<- bool) {
+
+	for {
+		select {
+		case <-recvCh:
+			fmt.Println("goroutine stop")
+			return
+		default:
+			fmt.Println("goroutine running...")
+			fmt.Println(runtime.NumGoroutine())
+			time.Sleep(3000 * time.Millisecond)
+			sendCh <- true
+		}
+		time.Sleep(1000 * time.Millisecond)
+	}
+}
+
+func safeCheck(ch <-chan bool) bool {
+	select {
+	case <-ch:
+		return false
+	default:
+	}
+	return true
+}
+
+func channelTest() {
 	stop := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -60,44 +151,4 @@ func wgTest() {
 	}()
 
 	wait.Wait()
-}
-
-var err error
-
-func cmdTest() {
-	cmd := exec.Command("ifconfig", "-a")
-	grepCmd := exec.Command("grep", "utun5")
-
-	// Get ps's stdout and attach it to grep's stdin.
-	grepCmd.Stdin, err = cmd.StdoutPipe()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	grepCmd.Stdout = os.Stdout
-
-	if err := grepCmd.Start(); err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	if err := cmd.Run(); err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	if err := grepCmd.Wait(); err != nil {
-		fmt.Println(err)
-		return
-	}
-}
-
-func shellTest() {
-	cmd := exec.Command("sh", "-c", "ifconfig -a | grep utun5")
-	cmd.Stdout = os.Stdout
-
-	if err := cmd.Run(); err != nil {
-		fmt.Println(err)
-		return
-	}
 }
